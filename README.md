@@ -1,5 +1,5 @@
 # sistema-chamados
-Sistema de chamados de suporte técnico, desenvolvido para praticar JavaScript, Node.js, Express, criação de API REST e integração com banco de dados.
+Sistema de chamados de suporte técnico, com registro e acompanhamento de chamados.
 
 
 # Sistema de Chamados
