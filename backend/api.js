@@ -11,8 +11,9 @@ app.get("/", (req, res) => {
 app.post("/chamados", (req, res) => {
     const novoID = chamados.length + 1
     const chamado = {
-        ...req.body,
-        id:novoID
+        id:novoID,
+        ...req.body
+        
     }
     chamados.push(chamado)
 
@@ -37,6 +38,21 @@ app.get("/chamados/:idChamado", (req, res) => {
         })
         console.log("Não encontrado, erro 404")
     }    
+})
+
+app.patch("/chamados/:idChamado", (req,res) =>{
+    const chamadoEncontrado = chamados.find((chamado)=>{
+        return Number(req.params.idChamado) === chamado.id
+    })
+    
+    if(chamadoEncontrado){
+        chamadoEncontrado.status = req.body.status
+        res.json(chamadoEncontrado)
+    }else{
+        res.status(404).json({
+            mensagem: "Chamado não encontrado"
+        })
+    }
 })
 
 app.listen(3000, () => {
