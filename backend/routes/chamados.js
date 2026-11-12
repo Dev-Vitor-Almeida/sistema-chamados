@@ -1,30 +1,44 @@
-function configurarRotas(app, chamados, contadorChamados){      
+const conexao = require("../banco")
+
+function configurarRotas(app){      
 app.get("/chamados", (req, res) => {
-    res.json(chamados)
+    conexao.query("SELECT * FROM chamados", (erro, resultados) => {
+        if(erro){
+            console.error("Erro ao buscar chamados:", erro.message);
+            return res.status(500).json({
+                erro: "Erro ao buscar chamados."
+            });
+        }
+
+        res.json(resultados)
+    })
 })
 
 
 app.get("/chamados/:idChamado", (req, res) => {
-    const chamadoEncontrado = chamados.find((chamado) =>{
-        return Number(req.params.idChamado) === chamado.id
-    })
-    if(chamadoEncontrado){
-        res.json(chamadoEncontrado)
-    }else{
-        res.status(404).json({
-            mensagem:"Chamado não encontrado"
-        })
-        console.log("Não encontrado, erro 404")
-    }    
+    conexao.query(
+        "SELECT * FROM chamados WHERE id = ?",
+        [req.params.idChamado],
+        (erro, resultados) => {
+            if(erro) {
+                console.error("Erro ao buscar chamado:", erro.message);
+                return res.status(500).json({
+                    mensagem: "Erro ao buscar chamado."
+                })
+            }
+
+            if(resultados.length === 0) {
+                return res.status(404).json({
+                    mensagem: "Chamado não encontrado"
+                })
+            }
+            res.json(resultados[0]);
+        } 
+    )    
 })
 
 
 app.patch("/chamados/:idChamado", (req,res) =>{
-    const chamadoEncontrado = chamados.find((chamado)=>{
-        return Number(req.params.idChamado) === chamado.id
-    })
-    
-    if(chamadoEncontrado){
         if(typeof req.body.status !=="string"){
             return res.status(400).json({
                 mensagem: "O status deve ser um texto"
@@ -37,40 +51,57 @@ app.patch("/chamados/:idChamado", (req,res) =>{
                 mensagem: "Status inválido"
             })
         }
-       
-        chamadoEncontrado.status = req.body.status
-        res.json(chamadoEncontrado)
-    }else{
-        res.status(404).json({
-            mensagem: "Chamado não encontrado"
-        })
-    }
+
+    conexao.query("UPDATE chamados SET status = ? WHERE id = ?",
+        [req.body.status, req.params.idChamado],
+        (erro, resultado) => {
+            if(erro){
+                console.error("Erro ao atualizar chamado:", erro.message);
+
+                return res.status(500).json({
+                    mensagem: "Erro ao atualizar chamado."
+                })
+            }
+
+            if(resultado.affectedRows === 0){
+                return res.status(404).json({
+                    mensagem: "Nenhum chamado foi encontrado"
+                })
+            }
+
+            res.json({
+                mensagem: "Status do chamado atualizado com sucesso!"
+            });
+        }
+    )
 })
 
 
 app.delete("/chamados/:idChamado", (req, res) =>{
-    const chamadoEncontrado = chamados.find((chamado) => {
-        return Number(req.params.idChamado) === chamado.id
-    })
+    conexao.query("DELETE FROM chamados WHERE id = ?", 
+        [req.params.idChamado],
+        (erro, resultado) =>{
+            if(erro){
+                console.error("Erro ao excluir chamado:", erro.message);
 
-    if(chamadoEncontrado){
-        const indice = chamados.findIndex((chamado)=>{
-            return chamado.id === chamadoEncontrado.id
-        })
+                return res.status(500).json({
+                    mensagem: "Erro ao excluir chamado."
+                })
+            }
 
-        chamados.splice(indice,1)
+            
+            if(resultado.affectedRows === 0){
+                return res.status(404).json({
+                    mensagem: "Nenhum chamado foi encontrado"
+                })
+            }
 
-        res.json({
-            mensagem: "Chamado excluído com sucesso!"
-        })
-    }else
-        {
-        res.status(404).json({
-            mensagem: "Chamado não encontrado"
-        })
-    }
+            res.json({
+                mensagem: "Chamado excluído com sucesso!"
+            });
+        }
+    )
 })
-
 
 app.post("/chamados", (req, res) => {
     if(typeof req.body.titulo !== "string"){
@@ -109,29 +140,47 @@ app.post("/chamados", (req, res) => {
         })
     }
 
-    //verifica se já existe um chamado com o mesmo título e descrição.
-    const chamadoDuplicado = chamados.find ((chamado) => {
-        return chamado.titulo === req.body.titulo && chamado.descricao === req.body.descricao
-    })   
+    conexao.query("SELECT id FROM chamados WHERE titulo = ? and descricao = ? LIMIT 1",
+    [req.body.titulo, req.body.descricao],
+    (erro, resultados) => {
+        if(erro){
+            console.error("Erro na operação:", erro.message);
 
-    if(chamadoDuplicado){
-        return res.status(400).json({
-            mensagem: "Chamado  duplicado!"
-        })
-    }
+            return res.status(500).json({
+                mensagem: "Erro ao verificar chamado"
+            })
+        }
 
-    const novoID = contadorChamados.proximoId++
-    const chamado = {
-        id:novoID,
-        ...req.body
-    }
-    chamados.push(chamado)
+        if(resultados.length > 0){
+            return res.status(400).json({
+                mensagem:"Já existe um chamado com esse título e descrição!"
+            })
+        }
 
-    res.json({mensagem:"Chamado recebido com sucesso!",
-        chamado: chamado
-    })
-})
+        conexao.query("INSERT INTO chamados (titulo, descricao, status) VALUES (?, ?, ?)", 
+        [req.body.titulo, req.body.descricao, req.body.status],
+        (erro, resultado) => {
+            if(erro){
+                console.error("Erro ao criar chamado:", erro.message)
 
+                return res.status(500).json({
+                    mensagem: "Erro ao criar chamado."
+                })
+            }
+
+            res.json({
+                mensagem: "Chamado criado com sucesso!",
+                chamado: {
+                    id: resultado.insertId,
+                    titulo: req.body.titulo,
+                    descricao: req.body.descricao,
+                    status: req.body.status
+                }
+            });
+        }
+    );   
+    });
+ });
 }
 
 module.exports = configurarRotas

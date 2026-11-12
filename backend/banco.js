@@ -16,3 +16,5 @@ conexao.connect((erro) => {
     }
     console.log("Conectado ao MySQL!")
 });
+
+module.exports = conexao;
